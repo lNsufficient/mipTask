@@ -209,7 +209,7 @@ class Apartment(object):
     def fullApartment(self):
         values = numpy.ones((self.r2.rows + 2, self.r2.columns*3 + 4))*self.r2.t0
         values[0,self.r2.columns+1:(self.r2.columns)*2 + 3] = self.r2.heat
-        values[-1,self.r2.columns+2:(self.r2.columns)*2 + 3] = self.r2.window
+        values[-1,self.r2.columns+1:(self.r2.columns)*2 + 3] = self.r2.window
         values[:self.r3.rows+2,-1] = self.r3.heat
         values[-(self.r1.rows+2):,0] = self.r1.heat
         for i in range(self.r1.rows):
@@ -228,7 +228,7 @@ class Apartment(object):
 
     
 apt = Apartment(20)
-r1, r2, r3 = apt(20)   
+r1, r2, r3 = apt(10)   
 
 print("r1: ", r1)
 print("r2: ", r2)
