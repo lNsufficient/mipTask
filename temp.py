@@ -18,7 +18,10 @@ class Room(object):
         self.t0 = 15
         self.heat = 40
         self.window = 5
-        self.ohm = 0.5
+        self.ohm = 0.8
+    
+    def ohmUpdate(self):
+        self.values = self.values*self.ohm + (1-self.ohm)*self.oldValues
 
 
     def derivative(self,u1,u2):
@@ -27,7 +30,6 @@ class Room(object):
     def nextSolution(self, bvNew):
         #print("omega : ", self.omega)
         self.values, self.oldValues = sl.solve(self.omega, self.newBV(bvNew)), self.values
-        self.values = self.ohm*self.values+(1-self.ohm)*self.oldValues        
     
     def newBV(self, bvNew):
         bv = self.bvStart + self.computeBoundaryValues(bvNew)
@@ -58,7 +60,6 @@ class Room2(Room):
    
     def nextSolution(self, bv1to2, bv3to2):
         self.values, self.oldValues = sl.solve(self.omega, self.newBV(bv1to2, bv3to2)), self.values
-        self.values = self.values*self.ohm + (1 - self.ohm)*self.oldValues
         #print("Temperatures in room 2: ", self.values) 
 
     def sendBoundaryValues(self):
@@ -197,6 +198,9 @@ class Apartment(object):
             bv2to1, bv2to3 = self.r2.sendBoundaryValues()
             self.r1.nextSolution(bv2to1)
             self.r3.nextSolution(bv2to3)
+            self.r1.ohmUpdate()
+            self.r2.ohmUpdate()
+            self.r3.ohmUpdate()
             bv1to2, bv3to2 = self.r1.sendBoundaryValues(), self.r3.sendBoundaryValues()
         print(self.fullApartment())
         return self.r1.values, self.r2.values, self.r3.values
@@ -223,7 +227,7 @@ class Apartment(object):
         
 
     
-apt = Apartment(15)
+apt = Apartment(20)
 r1, r2, r3 = apt(20)   
 
 print("r1: ", r1)
