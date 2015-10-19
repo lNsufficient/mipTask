@@ -1,3 +1,7 @@
+import numpy
+import scipy.linalg as sl
+
+
 class Room(Object):
     self.t0 = 15
     self.heat = 40
@@ -6,29 +10,59 @@ class Room(Object):
     def __init__(self, divisor):
         self.dx = 1/divisor
         self.columns = divisor 
-        self.rows = columns - 1 
+        self.rows = self.columns - 1 
         self.bvStart = self.boundaryValuesSetup()
-        self.values = zeroes 
+        self.values = numpy.zeros(self.columns*self.rows) 
         self.omega = self.createOmega(numpy.size(self.bv))
 
-    def derivative(self,u1,u2,u3):
-        return -1/
+    def derivative(self,u1,u2):
+        return (u1-u2)/self.dx
+
+    def nextSolution(self, bvNew):
+        self.values, self.oldValues = sl.solve(self.omega, self.newBV(bvNew)), self.values
+                
+    
+    def newBV(self, bvNew):
+        return self.bvStart + self.computeBoundaryValues(bvNew)
+
 #TODO: punkterna med oklara boundaryValues har inte fått sina värden. 
 
 class Room2(Room):
     def __init__(self, divisor):
-        dx = 1/divisor
-        columns = divisor - 1 #antal element som beräknas i varje rad
-        rows = collumns*2 + 1
+        self.dx = 1/divisor
+        self.columns = divisor - 1 #antal element som beräknas i varje rad
+        self.rows = self.columns*2 + 1
+        self.bvStart =self.boundaryValuesSetup()
+        self.values = numpy.zeros(self.columns*self.rows) 
+        self.omega = self.createOmega(numpy.size(self.bv))
+        self.bv0 = computeBoundaryValues(self.t0*numpy.ones(columns), self.t0*numpy.ones(columns))
+
+    def newBV(self, bv1to2, bv3to2):
+        return self.bvStart + self.computeBoundaryValues(bv1to2, bv3to2)
+   
+    def nextSolution(self, bv1to2, bv3to2):
+        self.values, self.oldValues = sl.solve(self.omega, self.newBV(bv1to2, bv3to2)), self.values
+
+    def sendBoundaryValues(self):
+        bv2to1 = numpy.zeros(self.columns)
+        bv2to3 = numpy.zeros(self.columns)
+       
+        for i in range(columns)
+            index1 = (self.columns+1)*self.columns+i*columns
+            index3 = self.columns - 1 + i*self.columns
+            bv2to1[i] = self.values[index1]
+            bv2to3[i] = self.values[index3]
   
-	def createOmega(size):
+        return bv2to1, bv2to3
+
+	def createOmega(self,size):
         diag = -4*numpy.ones(size)
         subdiag1 = numpy.array([ 1-i%2 for i in range(size-1)])
         subdiag2 = numpy.ones(size-2)
         Omega2 = numpy.diag(diag) + numpy.diag(subdiag1,1) + numpy.diag(subdiag1,-1) + numpy.diag(subdiag2,2) +  numpy.diag(subdiag2,-2)
         return Omega2
 
-    def boundaryValuesSetup()
+    def boundaryValuesSetup(self):
             
         bv = numpy.zeroes(numpy.size(self.values))
         bv[:self.columns] -= self.heat
@@ -38,18 +72,20 @@ class Room2(Room):
             bv[self.columns*(self.columns+1) + i*self.columns -1] -= self.t0
         return bv
 
-    def updateBoundaryValues():
-        self.bv = numpy.zeros(numpy.size(self.bvStart))
+    def computeBoundaryValues(self, bv1to2, bv3to2):
+        bv = numpy.zeros(numpy.size(self.bvStart))
         for i in range(self.columns):
-            self.bv[self.columns*(i+1)-1] -= bv3to2[i]
+            bv[self.columns*(i+1)-1] -= bv3to2[i]
 
         for i in range(self.columns):
-            self.bv[self.columns*(self.columns+1)+self.columns*i] -= bv1to2[i]
+            bv[self.columns*(self.columns+1)+self.columns*i] -= bv1to2[i]
+        
+        return bv
         
 
 class Room1(Room):
    
-    def boundaryValuesSetup():
+    def boundaryValuesSetup(self):
         bv = numpy.zeroes(numpy.size(self.values))
         bv[:self.colums] -= self.t0
         bv[-self.columns:] -= self.t0
@@ -57,7 +93,7 @@ class Room1(Room):
             bv[i*self.columns] -= self.heat
         return bv
             
-    def createOmega(size):
+    def createOmega(self, size):
         diag = -4*numpy.ones(size)
         subdiag1 = numpy.ones(size-1)
         subdiag2 = numpy.ones(size-3)
@@ -68,14 +104,25 @@ class Room1(Room):
         return Omega1
         
 
-    def updateBoundaryValues():
-        self.bv = numpy.zeros(numpy.size(self.bvStart))
+    def computeBoundaryValues(self, bv2to1):
+        bv = numpy.zeros(numpy.size(self.bvStart))
         for i in range(rows):
-            self.bv[self.columns*(i+1) - 1] = -1/(2*dx)*(self.values[self.columns-1 + self.columns*i] - bv2to1[i])
-    
+            #bv2to1 contains values, derivative is calculated in this room.
+            index = self.columns*(i+1) - 1
+            bv[index] = - 1/self.dx*self.derivative(bv2to1[i],self.values[index])
+            #self.bv[self.columns*(i+1) - 1] = -1/(2*dx)*(self.values[self.columns-1 + self.columns*i] - bv2to1[i])
+        return bv
+
+    def sendBoundaryValues(self):
+        bv1to2 = numpy.zeros(self.rows)
+        for i in range(self.rows):
+            index = (i+1)*self.columns-1
+            bv1to2[i] = self.values[index]
+        return bv1to2
+            
 class Room3(Room):
 
-    def boundaryValuesSetup():
+    def boundaryValuesSetup(self):
         bv = numpy.zeroes(numpy.size(self.values))
         bv[:self.columns] -= self.t0
         bv[-self.columns:] -= self.t0
@@ -83,12 +130,14 @@ class Room3(Room):
             bv[i*self.columns + self.columns - 1] -= self.heat
         return bv
 
-    def updateBoundaryValues():
-        self.bv = numpy.zeros(numpy.size(self.bvStart))
+    def computeBoundaryValues(self, bv2to3):
+        bv = numpy.zeros(numpy.size(self.bvStart))
         for i in range(rows):
-            self.bv[self.columns*i+1] = -self.derivative(bv2to3[i], self.values[self.columns*i])
-       
-    def createOmega(size):
+            index = self.columns*i
+            bv[index] = -self.derivative(bv2to3[i], self.values[index])/self.dx
+        return bv   
+    
+    def createOmega(self, size):
         diag = -4*numpy.ones(size)
         subdiag1 = numpy.ones(size-1)
         subdiag2 = numpy.ones(size-3)
@@ -97,4 +146,22 @@ class Room3(Room):
         subdiag1[(size-2)/2] = 0
         Omega3 = numpy.diag(diag) + numpy.diag(subdiag1,1)+ numpy.diag(subdiag1,-1) + numpy.diag(subdiag2,3)+ numpy.diag(subdiag2,-3)
         return Omega3   
+    
+    def sendBoundaryValues(self):
+        bv3to2 = numpy.zeros(self.rows)
+        for i in range(self.rows):
+            index = self.columns * i
+            bv3to2[i] = self.values[index]
+        return bv3to2
+
+class Apartment(Object):
+    def __init__(self, divisor):
+        self.r1 = Room1(divisor)
+        self.r2 = Room2(divisor)
+        self.r3 = Room3(divisor)
+
+    def __call__(self, iterations):
+        r2.
+        for i in range(iterations):
+            r2.
     
