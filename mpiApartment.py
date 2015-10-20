@@ -2,6 +2,8 @@ import numpy
 import scipy.linalg as sl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+from mpi4py import MPI
+
 # ~/anaconda3/bin/mpiexec -n 5 ~/anaconda3/bin/python3.4 temp.py
 
 class Room(object):
@@ -18,7 +20,7 @@ class Room(object):
         self.t0 = 15
         self.heat = 40
         self.window = 5
-        self.ohm = 0.7 
+        self.ohm = 0.8
     
     def ohmUpdate(self):
         self.values = self.values*self.ohm + (1-self.ohm)*self.oldValues
@@ -194,16 +196,42 @@ class Apartment(object):
     def __call__(self, iterations):
         bv1to2, bv3to2 = self.r2.t0*numpy.ones(self.r2.columns), self.r2.t0*numpy.ones(self.r2.columns) 
         for i in range(iterations):
-            self.r2.nextSolution(bv1to2, bv3to2)
-            bv2to1, bv2to3 = self.r2.sendBoundaryValues()
-            self.r1.nextSolution(bv2to1)
-            self.r3.nextSolution(bv2to3)
-            self.r1.ohmUpdate()
-            self.r2.ohmUpdate()
-            self.r3.ohmUpdate()
-            bv1to2, bv3to2 = self.r1.sendBoundaryValues(), self.r3.sendBoundaryValues()
-        print(self.fullApartment())
-        return self.r1.values, self.r2.values, self.r3.values
+            if (MPI.COMM_WORLD.rank == 1):
+                self.r2.nextSolution(bv1to2, bv3to2)
+                bv2to1, bv2to3 = self.r2.sendBoundaryValues()
+                MPI.COMM_WORLD.send(bv2to1, dest=0)
+                MPI.COMM_WORLD.send(bv2to3, dest=2)
+                bv1to2 = MPI.COMM_WORLD.recv(source=0)
+                bv3to2 = MPI.COMM_WORLD.recv(source=2)
+                self.r2.ohmUpdate()
+
+            elif (MPI.COMM_WORLD.rank == 0):
+                #bv2to1 = numpy.zeros(self.r2.columns) 
+                bv2to1 = MPI.COMM_WORLD.recv(source=1)
+                self.r1.nextSolution(bv2to1)
+                self.r1.ohmUpdate()
+                bv1to2 = self.r1.sendBoundaryValues()
+                MPI.COMM_WORLD.send(bv1to2, dest=1)
+
+            elif (MPI.COMM_WORLD.rank == 2):
+                #bv2to3 = numpy.zeros(self.r2.columns)
+                bv2to3 = MPI.COMM_WORLD.recv(source=1)        
+                self.r3.nextSolution(bv2to3)
+                self.r3.ohmUpdate()
+                bv3to2 = self.r3.sendBoundaryValues()
+                MPI.COMM_WORLD.send(bv3to2, dest=1)
+
+        if (MPI.COMM_WORLD.rank == 1):
+            self.r1 = MPI.COMM_WORLD.recv(source=0)
+            self.r3 = MPI.COMM_WORLD.recv(source=2)
+            print(self.fullApartment())
+            return self.r1.values, self.r2.values, self.r3.values
+        
+        elif (MPI.COMM_WORLD.rank == 0):
+            MPI.COMM_WORLD.send(self.r1, dest=1)
+
+        elif (MPI.COMM_WORLD.rank == 2):
+            MPI.COMM_WORLD.send(self.r3, dest=1)
 
 
     def fullApartment(self):
@@ -228,8 +256,8 @@ class Apartment(object):
 
     
 apt = Apartment(20)
-r1, r2, r3 = apt(10)   
-
-print("r1: ", r1)
-print("r2: ", r2)
-print("r3: ", r3)
+#r1, r2, r3 = apt(10)   
+apt(10)
+#print("r1: ", r1)
+#print("r2: ", r2)
+#print("r3: ", r3)
